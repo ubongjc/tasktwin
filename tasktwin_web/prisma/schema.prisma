@@ -53,6 +53,7 @@ model User {
   teams         TeamMember[]
   reports       Report[]     @relation("ReportedBy")
   reportedUser  Report[]     @relation("ReportedUser")
+  subscriptions Subscription[]
 
   @@index([clerkId])
   @@index([email])
@@ -243,4 +244,50 @@ model MatchQueue {
   @@index([userId])
   @@index([expiresAt])
   @@map("match_queue")
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String
+  stripeSubscriptionId  String    @unique
+  stripeCustomerId      String
+  stripePriceId         String
+  status                String    // active, canceled, past_due, trialing, etc.
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean   @default(false)
+  canceledAt            DateTime?
+  trialStart            DateTime?
+  trialEnd              DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments              Payment[]
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                    String    @id @default(cuid())
+  subscriptionId        String?
+  stripeInvoiceId       String    @unique
+  stripeSubscriptionId  String?
+  amount                Int       // Amount in cents
+  currency              String    @default("usd")
+  status                String    // succeeded, failed, pending
+  paidAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  subscription          Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("payments")
 }
