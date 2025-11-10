@@ -1,0 +1,293 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchStatus {
+  PENDING
+  MATCHED
+  IN_SESSION
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String?   @unique
+  displayName   String?
+  avatarUrl     String?
+  role          UserRole  @default(USER)
+  streakCount   Int       @default(0)
+  lastActiveAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  matches       Match[]
+  recaps        Recap[]
+  streaks       Streak[]
+  teams         TeamMember[]
+  reports       Report[]     @relation("ReportedBy")
+  reportedUser  Report[]     @relation("ReportedUser")
+  subscriptions Subscription[]
+
+  @@index([clerkId])
+  @@index([email])
+  @@map("users")
+}
+
+model Room {
+  id              String      @id @default(cuid())
+  topic           String
+  description     String?
+  status          RoomStatus  @default(WAITING)
+  startAt         DateTime?
+  endAt           DateTime?
+  durationMinutes Int         @default(25)
+  pausedAt        DateTime?
+  pauseDuration   Int         @default(0) // in seconds
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  matches         Match[]
+  recap           Recap?
+  checklist       ChecklistItem[]
+
+  @@index([status])
+  @@index([startAt])
+  @@map("rooms")
+}
+
+model Match {
+  id        String      @id @default(cuid())
+  userId    String
+  roomId    String
+  status    MatchStatus @default(PENDING)
+  joinedAt  DateTime    @default(now())
+  leftAt    DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([userId])
+  @@index([roomId])
+  @@index([status])
+  @@map("matches")
+}
+
+model Recap {
+  id              String    @id @default(cuid())
+  roomId          String    @unique
+  text            String
+  user1Id         String
+  user2Id         String?
+  user1Approved   Boolean   @default(false)
+  user2Approved   Boolean   @default(false)
+  finalizedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user1           User      @relation(fields: [user1Id], references: [id])
+
+  @@index([roomId])
+  @@index([user1Id])
+  @@map("recaps")
+}
+
+model ChecklistItem {
+  id          String    @id @default(cuid())
+  roomId      String
+  text        String
+  completed   Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  room        Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("checklist_items")
+}
+
+model Streak {
+  id                String    @id @default(cuid())
+  userId            String
+  date              DateTime  @db.Date
+  sessionsCompleted Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("streaks")
+}
+
+model Team {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  avatarUrl   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  members     TeamMember[]
+  okrs        OKR[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String    @id @default(cuid())
+  teamId    String
+  userId    String
+  role      String    @default("MEMBER") // OWNER, ADMIN, MEMBER
+  joinedAt  DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model OKR {
+  id          String    @id @default(cuid())
+  teamId      String
+  title       String
+  description String?
+  quarter     String    // e.g., "2025-Q1"
+  progress    Int       @default(0) // 0-100
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([quarter])
+  @@map("okrs")
+}
+
+model Report {
+  id            String    @id @default(cuid())
+  reporterId    String
+  reportedUserId String
+  reason        String
+  description   String?
+  status        String    @default("PENDING") // PENDING, REVIEWING, RESOLVED, DISMISSED
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  reporter      User      @relation("ReportedBy", fields: [reporterId], references: [id])
+  reportedUser  User      @relation("ReportedUser", fields: [reportedUserId], references: [id])
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@map("reports")
+}
+
+model MatchQueue {
+  id          String    @id @default(cuid())
+  userId      String
+  topic       String
+  intent      String[] // e.g., ["focus", "accountability"]
+  preferences Json?     // Store additional matching preferences
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("match_queue")
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String
+  stripeSubscriptionId  String    @unique
+  stripeCustomerId      String
+  stripePriceId         String
+  status                String    // active, canceled, past_due, trialing, etc.
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean   @default(false)
+  canceledAt            DateTime?
+  trialStart            DateTime?
+  trialEnd              DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments              Payment[]
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                    String    @id @default(cuid())
+  subscriptionId        String?
+  stripeInvoiceId       String    @unique
+  stripeSubscriptionId  String?
+  amount                Int       // Amount in cents
+  currency              String    @default("usd")
+  status                String    // succeeded, failed, pending
+  paidAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  subscription          Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("payments")
+}
