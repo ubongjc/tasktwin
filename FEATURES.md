@@ -378,30 +378,35 @@ DELETE /api/user/data             - Delete account and data
 
 ## Change Log
 
-### 2025-11-10 - Project Initialization
+### 2025-11-10 - Project Initialization & Documentation Framework
 **Branch:** `claude/add-features-documentation-011CUzjbfwZWnKSSGBWvP8g9`
 
 #### Added
 - Created comprehensive FEATURES.md documentation
 - Established project vision and architecture
-- Defined MVP feature set
-- Documented API surface
-- Created development setup guide
-- Defined database schema
+- Defined MVP feature set with priority ordering
+- Documented complete API surface (15+ endpoints)
+- Created development setup guide with environment variables
+- Defined database schema for core tables
 - Established documentation update workflow
+- Added `.github/DOCUMENTATION_WORKFLOW.md` with update guidelines
+- Created change log entry template
+- Added pre-push checklist for documentation updates
 
 #### Repository Status
 - Clean repository with initial commit
 - Branch structure established
 - Documentation foundation complete
+- Workflow guidelines in place
 
 #### Next Steps
-- Scaffold web application (Next.js)
+- Scaffold web application (Next.js 15 + TypeScript)
 - Scaffold iOS application (SwiftUI)
-- Implement database schema
-- Set up authentication system
-- Create core API endpoints
+- Implement database schema with Prisma
+- Set up authentication system (Passkey + Magic Link)
+- Create core API endpoints (health, auth, match, room)
 - Implement matching algorithm
+- Set up development environment (.env.example)
 
 ---
 
